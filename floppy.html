@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Mobile-Friendly Brick Breaker</title>
+  <style>
+    #gameCanvas {
+      border: 1px solid black;
+      background: #f0f0f0;
+      display: none;
+      max-width: 100%;
+      height: auto;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+      font-family: 'Roboto', 'Arial', sans-serif;
+      touch-action: manipulation;
+      /* Prevents default touch gestures */
+    }
+
+    .menu {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      max-width: 90%;
+      width: 300px;
+    }
+
+    .menu h1 {
+      font-size: 24px;
+      /* Smaller for mobile */
+      margin: 0 0 15px 0;
+      color: #202124;
+      font-weight: 400;
+    }
+
+    .menu button {
+      padding: 8px 16px;
+      /* Smaller buttons for mobile */
+      font-size: 14px;
+      margin: 5px;
+      cursor: pointer;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      transition: background 0.2s ease;
+      width: 180px;
+      /* Smaller buttons for mobile */
+    }
+
+    .menu button:hover {
+      background: #1557b0;
+    }
+
+    .menu p {
+      font-size: 14px;
+      /* Smaller text for mobile */
+      color: #202124;
+      margin: 10px 0;
+    }
+
+    /* Media queries for larger screens */
+    @media (min-width: 768px) {
+      #gameCanvas {
+        width: 600px;
+        /* Fixed width for tablets/desktops */
+        height: 800px;
+        /* Fixed height for tablets/desktops */
+      }
+
+      .menu {
+        width: 400px;
+        padding: 30px;
+      }
+
+      .menu h1 {
+        font-size: 32px;
+      }
+
+      .menu button {
+        padding: 10px 24px;
+        font-size: 16px;
+        width: 200px;
+      }
+
+      .menu p {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Start Menu -->
+  <div id="startMenu" class="menu">
+    <h1>Brick Breaker</h1>
+    <button id="easyButton">Easy</button>
+    <button id="mediumButton">Medium</button>
+    <button id="hardButton">Hard</button>
+  </div>
+
+  <!-- Game Over Menu -->
+  <div id="gameOverMenu" class="menu" style="display: none;">
+    <h1 id="gameOverTitle"></h1>
+    <p id="finalScore"></p>
+    <button id="replayButton">Play Again</button>
+    <button id="mainMenuButton">Main Menu</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const startMenu = document.getElementById("startMenu");
+    const gameOverMenu = document.getElementById("gameOverMenu");
+    const easyButton = document.getElementById("easyButton");
+    const mediumButton = document.getElementById("mediumButton");
+    const hardButton = document.getElementById("hardButton");
+    const replayButton = document.getElementById("replayButton");
+    const mainMenuButton = document.getElementById("mainMenuButton");
+
+    // Dynamically set canvas size based on device
+    function setCanvasSize() {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        canvas.width = Math.min(480, window.innerWidth - 20); // Max 480px for phones, subtract padding
+        canvas.height = canvas.width * 1.5; // Maintain aspect ratio (e.g., 480x720)
+      } else {
+        canvas.width = 600; // Fixed size for desktops/tablets
+        canvas.height = 800;
+      }
+      canvas.style.maxWidth = '100%';
+      canvas.style.height = 'auto';
+    }
+
+    // Initial setup
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+
+    // Sound effects (placeholders)
+    const bounceSound = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+    const brickBreakSound = new Audio("data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+    const winSound = new Audio("data:audio/wav;base64,UklGRjAAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+    const loseSound = new Audio("data:audio/wav;base64,UklGRjEAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+
+    // Game settings
+    let difficulty = "easy";
+    const BALL_SPEEDS = {
+      easy: 8,
+      medium: 12,
+      hard: 16
+    };
+
+    const ball = {
+      x: canvas.width / 2,
+      y: canvas.height - 30,
+      dx: BALL_SPEEDS.easy,
+      dy: -BALL_SPEEDS.easy,
+      radius: 10
+    };
+
+    const paddle = {
+      height: 10,
+      width: 80, // Slightly smaller for mobile
+      x: (canvas.width - 80) / 2
+    };
+
+    const brick = {
+      width: 50, // Smaller for mobile
+      height: 15, // Smaller for mobile
+      padding: 5, // Smaller padding for mobile
+      offsetTop: 20,
+      offsetLeft: 20
+    };
+
+    let rightPressed = false;
+    let leftPressed = false;
+    let score = 0;
+    let gameRunning = false;
+    let bricks = [];
+    let obstacles = [];
+    let touchX = null;
+
+    // Brick patterns (adjusted for smaller screens)
+    function createEasyBricks() {
+      bricks = [];
+      const pyramidHeight = 4; // Reduced for smaller screens
+      for (let level = 0; level < pyramidHeight; level++) {
+        bricks[level] = [];
+        const bricksInRow = pyramidHeight - level;
+        const totalWidth = bricksInRow * (brick.width + brick.padding) - brick.padding;
+        const startX = (canvas.width - totalWidth) / 2;
+        for (let i = 0; i < bricksInRow; i++) {
+          bricks[level][i] = { x: 0, y: 0, status: 1 };
+        }
+      }
+      obstacles = [];
+    }
+
+    function createMediumBricks() {
+      bricks = [];
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 3;
+      const radius = Math.min(canvas.width, canvas.height) / 5; // Smaller radius for mobile
+      const brickCount = 8; // Fewer bricks for mobile
+      for (let i = 0; i < brickCount; i++) {
+        const angle = (i / brickCount) * 2 * Math.PI;
+        const x = centerX + radius * Math.cos(angle) - brick.width / 2;
+        const y = centerY + radius * Math.sin(angle) - brick.height / 2;
+        bricks[i] = [{ x: 0, y: 0, status: 1 }];
+        bricks[i][0].x = x;
+        bricks[i][0].y = y;
+      }
+      obstacles = [
+        { x: canvas.width / 4, y: canvas.height / 2 - 30, width: 8, height: 60 }, // Smaller obstacles
+        { x: 3 * canvas.width / 4, y: canvas.height / 2 - 30, width: 8, height: 60 }
+      ];
+    }
+
+    function createHardBricks() {
+      bricks = [];
+      const rows = 6; // Reduced for smaller screens
+      const cols = Math.floor(canvas.width / (brick.width + brick.padding));
+      for (let r = 0; r < rows; r++) {
+        bricks[r] = [];
+        for (let c = 0; c < cols; c++) {
+          bricks[r][c] = { x: 0, y: 0, status: 1 };
+        }
+      }
+      obstacles = [
+        { x: canvas.width / 2 - 40, y: canvas.height / 2, width: 80, height: 8, dx: 3, moving: true } // Smaller moving obstacle
+      ];
+    }
+
+    // Event listeners
+    document.addEventListener("keydown", keyDownHandler);
+    document.addEventListener("keyup", keyUpHandler);
+    document.addEventListener("mousemove", mouseMoveHandler);
+    canvas.addEventListener("touchstart", touchStartHandler);
+    canvas.addEventListener("touchmove", touchMoveHandler);
+    canvas.addEventListener("touchend", touchEndHandler);
+    window.addEventListener('resize', resizeCanvas);
+    easyButton.addEventListener("click", () => startGame("easy"));
+    mediumButton.addEventListener("click", () => startGame("medium"));
+    hardButton.addEventListener("click", () => startGame("hard"));
+    replayButton.addEventListener("click", restartGame);
+    mainMenuButton.addEventListener("click", returnToMainMenu);
+
+    function resizeCanvas() {
+      setCanvasSize();
+      paddle.x = (canvas.width - paddle.width) / 2;
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height - 30;
+      resetBricksAndObstacles();
+    }
+
+    function keyDownHandler(e) {
+      if (e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+      else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+    }
+
+    function keyUpHandler(e) {
+      if (e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+      else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+    }
+
+    function mouseMoveHandler(e) {
+      const relativeX = e.clientX - canvas.offsetLeft;
+      if (relativeX > 0 && relativeX < canvas.width) paddle.x = relativeX - paddle.width / 2;
+    }
+
+    function touchStartHandler(e) {
+      e.preventDefault();
+      touchX = e.touches[0].clientX - canvas.offsetLeft;
+    }
+
+    function touchMoveHandler(e) {
+      e.preventDefault();
+      if (touchX !== null) {
+        const newTouchX = e.touches[0].clientX - canvas.offsetLeft;
+        const deltaX = newTouchX - touchX;
+        paddle.x += deltaX * 1.5; // Slightly faster touch response for mobile
+        if (paddle.x < 0) paddle.x = 0;
+        if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+        touchX = newTouchX;
+      }
+    }
+
+    function touchEndHandler(e) {
+      e.preventDefault();
+      touchX = null;
+    }
+
+    function collisionDetection() {
+      let brickHit = false;
+      if (difficulty === "easy") {
+        for (let level = 0; level < bricks.length; level++) {
+          for (let i = 0; i < bricks[level].length; i++) {
+            const b = bricks[level][i];
+            if (b.status === 1 && ball.x > b.x && ball.x < b.x + brick.width && ball.y > b.y && ball.y < b.y + brick.height) {
+              ball.dy = -ball.dy;
+              b.status = 0;
+              score++;
+              brickHit = true;
+              if (score === getTotalBrickCount()) endGame(true);
+            }
+          }
+        }
+      } else if (difficulty === "medium") {
+        for (let i = 0; i < bricks.length; i++) {
+          const b = bricks[i][0];
+          if (b.status === 1 && ball.x > b.x && ball.x < b.x + brick.width && ball.y > b.y && ball.y < b.y + brick.height) {
+            ball.dy = -ball.dy;
+            b.status = 0;
+            score++;
+            brickHit = true;
+            if (score === getTotalBrickCount()) endGame(true);
+          }
+        }
+      } else {
+        for (let r = 0; r < bricks.length; r++) {
+          for (let c = 0; c < bricks[r].length; c++) {
+            const b = bricks[r][c];
+            if (b.status === 1 && ball.x > b.x && ball.x < b.x + brick.width && ball.y > b.y && ball.y < b.y + brick.height) {
+              ball.dy = -ball.dy;
+              b.status = 0;
+              score++;
+              brickHit = true;
+              if (score === getTotalBrickCount()) endGame(true);
+            }
+          }
+        }
+      }
+      if (brickHit) playSound(brickBreakSound);
+
+      let obstacleHit = false;
+      obstacles.forEach(obs => {
+        if (ball.x + ball.radius > obs.x && ball.x - ball.radius < obs.x + obs.width &&
+          ball.y + ball.radius > obs.y && ball.y - ball.radius < obs.y + obs.height) {
+          if (ball.x < obs.x || ball.x > obs.x + obs.width) ball.dx = -ball.dx;
+          else ball.dy = -ball.dy;
+          obstacleHit = true;
+        }
+      });
+      if (obstacleHit) playSound(bounceSound);
+    }
+
+    function getTotalBrickCount() {
+      let count = 0;
+      if (difficulty === "easy") {
+        for (let level = 0; level < bricks.length; level++) count += bricks[level].length;
+      } else if (difficulty === "medium") {
+        count = bricks.length;
+      } else {
+        for (let r = 0; r < bricks.length; r++) count += bricks[r].length;
+      }
+      return count;
+    }
+
+    function playSound(sound) {
+      sound.currentTime = 0;
+      sound.play().catch(e => console.log("Sound play error:", e));
+    }
+
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#0095DD";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawPaddle() {
+      ctx.beginPath();
+      ctx.rect(paddle.x, canvas.height - paddle.height, paddle.width, paddle.height);
+      ctx.fillStyle = "#0095DD";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawBricks() {
+      if (difficulty === "easy") {
+        for (let level = 0; level < bricks.length; level++) {
+          const bricksInRow = bricks.length - level;
+          const totalWidth = bricksInRow * (brick.width + brick.padding) - brick.padding;
+          const startX = (canvas.width - totalWidth) / 2;
+          for (let i = 0; i < bricks[level].length; i++) {
+            if (bricks[level][i].status === 1) {
+              const brickX = startX + (i * (brick.width + brick.padding));
+              const brickY = brick.offsetTop + (level * (brick.height + brick.padding));
+              bricks[level][i].x = brickX;
+              bricks[level][i].y = brickY;
+              ctx.beginPath();
+              ctx.rect(brickX, brickY, brick.width, brick.height);
+              ctx.fillStyle = "#0095DD";
+              ctx.fill();
+              ctx.closePath();
+            }
+          }
+        }
+      } else if (difficulty === "medium") {
+        for (let i = 0; i < bricks.length; i++) {
+          if (bricks[i][0].status === 1) {
+            const b = bricks[i][0];
+            ctx.beginPath();
+            ctx.rect(b.x, b.y, brick.width, brick.height);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+          }
+        }
+      } else {
+        for (let r = 0; r < bricks.length; r++) {
+          for (let c = 0; c < bricks[r].length; c++) {
+            if (bricks[r][c].status === 1) {
+              const brickX = c * (brick.width + brick.padding) + brick.offsetLeft;
+              const brickY = r * (brick.height + brick.padding) + brick.offsetTop;
+              bricks[r][c].x = brickX;
+              bricks[r][c].y = brickY;
+              ctx.beginPath();
+              ctx.rect(brickX, brickY, brick.width, brick.height);
+              ctx.fillStyle = "#0095DD";
+              ctx.fill();
+              ctx.closePath();
+            }
+          }
+        }
+      }
+    }
+
+    function drawObstacles() {
+      obstacles.forEach(obs => {
+        ctx.beginPath();
+        ctx.rect(obs.x, obs.y, obs.width, obs.height);
+        ctx.fillStyle = "#666";
+        ctx.fill();
+        ctx.closePath();
+        if (obs.moving) {
+          obs.x += obs.dx;
+          if (obs.x + obs.width > canvas.width || obs.x < 0) obs.dx = -obs.dx;
+        }
+      });
+    }
+
+    function drawScore() {
+      ctx.font = "12px Arial"; // Smaller font for mobile
+      ctx.fillStyle = "#0095DD";
+      ctx.fillText("Score: " + score, 8, 16); // Adjusted position for smaller screens
+    }
+
+    function draw() {
+      if (!gameRunning) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBricks();
+      drawBall();
+      drawPaddle();
+      drawObstacles();
+      drawScore();
+      collisionDetection();
+
+      let wallHit = false;
+      if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+        ball.dx = -ball.dx;
+        wallHit = true;
+      }
+      if (ball.y + ball.dy < ball.radius) {
+        ball.dy = -ball.dy;
+        wallHit = true;
+      } else if (ball.y + ball.dy > canvas.height - ball.radius) {
+        if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+          ball.dy = -ball.dy;
+          playSound(bounceSound);
+        } else {
+          endGame(false);
+        }
+      }
+      if (wallHit) playSound(bounceSound);
+
+      if (rightPressed && paddle.x < canvas.width - paddle.width) paddle.x += 5; // Slightly slower for mobile precision
+      else if (leftPressed && paddle.x > 0) paddle.x -= 5;
+
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+      requestAnimationFrame(draw);
+    }
+
+    function startGame(diff) {
+      difficulty = diff;
+      ball.dx = BALL_SPEEDS[difficulty];
+      ball.dy = -BALL_SPEEDS[difficulty];
+      resetBricksAndObstacles();
+      startMenu.style.display = "none";
+      canvas.style.display = "block";
+      gameRunning = true;
+      draw();
+    }
+
+    function endGame(won) {
+      gameRunning = false;
+      canvas.style.display = "none";
+      gameOverMenu.style.display = "block";
+      document.getElementById("gameOverTitle").textContent = won ? "YOU WIN!" : "GAME OVER";
+      document.getElementById("finalScore").textContent = "Final Score: " + score;
+      playSound(won ? winSound : loseSound);
+    }
+
+    function restartGame() {
+      gameOverMenu.style.display = "none";
+      canvas.style.display = "block";
+      resetGame();
+      gameRunning = true;
+      draw();
+    }
+
+    function returnToMainMenu() {
+      gameOverMenu.style.display = "none";
+      startMenu.style.display = "block";
+      resetGame();
+    }
+
+    function resetGame() {
+      score = 0;
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height - 30;
+      ball.dx = BALL_SPEEDS[difficulty];
+      ball.dy = -BALL_SPEEDS[difficulty];
+      paddle.x = (canvas.width - paddle.width) / 2;
+      resetBricksAndObstacles();
+    }
+
+    function resetBricksAndObstacles() {
+      if (difficulty === "easy") createEasyBricks();
+      else if (difficulty === "medium") createMediumBricks();
+      else createHardBricks();
+    }
+
+    // Initial setup
+    createEasyBricks();
+  </script>
+</body>
+
+</html>
