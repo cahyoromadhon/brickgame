@@ -1,0 +1,121 @@
+#gameCanvas {
+  border: 1px solid black;
+  background: #f0f0f0;
+  display: none;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  position: relative;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  touch-action: manipulation;
+}
+
+.menu,
+.pauseMenu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 90%;
+  width: 300px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  /* Semi-transparent white background for main menu */
+  border: 2px solid #000;
+  /* Little black outline (border) for menus */
+}
+
+.menu h1,
+.pauseMenu h1 {
+  font-size: 24px;
+  margin: 0 0 15px 0;
+  color: #202124;
+  font-weight: 400;
+}
+
+.menu button,
+.pauseMenu button {
+  padding: 8px 16px;
+  font-size: 14px;
+  margin: 5px 0;
+  cursor: pointer;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  width: 180px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.menu button:hover,
+.pauseMenu button:hover {
+  background: #1557b0;
+}
+
+.menu p,
+.pauseMenu p {
+  font-size: 14px;
+  color: #202124;
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+#pauseOverlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  /* Semi-transparent dark background */
+  z-index: 5;
+}
+
+@media (min-width: 768px) {
+  #gameCanvas {
+    width: 600px;
+    height: 800px;
+  }
+
+  .menu,
+  .pauseMenu {
+    width: 400px;
+    padding: 30px;
+  }
+
+  .menu h1,
+  .pauseMenu h1 {
+    font-size: 32px;
+  }
+
+  .menu button,
+  .pauseMenu button {
+    padding: 10px 24px;
+    font-size: 16px;
+    width: 200px;
+  }
+
+  .menu p,
+  .pauseMenu p {
+    font-size: 16px;
+  }
+}
